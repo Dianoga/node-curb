@@ -4,9 +4,12 @@ import { CurbProfile } from './';
 global.URLSearchParams = require('url-search-params');
 
 export class Curb {
-	constructor(clientId, clientSecret) {
-		this._clientId = clientId;
-		this._clientSecret = clientSecret;
+	constructor(opts) {
+		this.opts = Object.assign({
+			clientId: null,
+			clientSecret: null,
+			logger: message => {}
+		}, opts);
 
 		this._curbApiUrl = 'https://app.energycurb.com';
 		this._tokenUrl = '/oauth2/token';
@@ -26,11 +29,11 @@ export class Curb {
 		data.append('username', username);
 		data.append('password', password);
 
-		console.log("Getting access tokens");
+		this.opts.logger("Getting access tokens");
 		return this.api.post(this._tokenUrl, data, {
 			auth: {
-				username: this._clientId,
-				password: this._clientSecret
+				username: this.opts.clientId,
+				password: this.opts.clientSecret
 			}
 		}).then(resp => {
 			const token = new Buffer(resp.data.access_token).toString('base64');
@@ -43,7 +46,7 @@ export class Curb {
 	}
 
 	_endpoints() {
-		console.log("Getting API endpoints");
+		this.opts.logger("Getting API endpoints");
 		return this.api.get('/api')
 			.then((resp) => {
 				this._devicesUrl = resp.data._links.devices.href;
@@ -52,10 +55,10 @@ export class Curb {
 	}
 
 	_profiles() {
-		console.log("Getting user information");
+		this.opts.logger("Getting user information");
 		return this.api.get(this._profilesUrl)
 			.then(resp => {
-				console.log("Processing user information");
+				this.opts.logger("Processing user information");
 				const profiles = resp.data._embedded.profiles;
 				profiles.forEach(val => {
 					this.profiles.push(new CurbProfile(val));

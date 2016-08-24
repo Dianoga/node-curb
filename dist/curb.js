@@ -20,11 +20,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 global.URLSearchParams = require('url-search-params');
 
 var Curb = exports.Curb = function () {
-	function Curb(clientId, clientSecret) {
+	function Curb(opts) {
 		_classCallCheck(this, Curb);
 
-		this._clientId = clientId;
-		this._clientSecret = clientSecret;
+		this.opts = Object.assign({
+			clientId: null,
+			clientSecret: null,
+			logger: function logger(message) {}
+		}, opts);
 
 		this._curbApiUrl = 'https://app.energycurb.com';
 		this._tokenUrl = '/oauth2/token';
@@ -48,11 +51,11 @@ var Curb = exports.Curb = function () {
 			data.append('username', username);
 			data.append('password', password);
 
-			console.log("Getting access tokens");
+			this.opts.logger("Getting access tokens");
 			return this.api.post(this._tokenUrl, data, {
 				auth: {
-					username: this._clientId,
-					password: this._clientSecret
+					username: this.opts.clientId,
+					password: this.opts.clientSecret
 				}
 			}).then(function (resp) {
 				var token = new Buffer(resp.data.access_token).toString('base64');
@@ -68,7 +71,7 @@ var Curb = exports.Curb = function () {
 		value: function _endpoints() {
 			var _this2 = this;
 
-			console.log("Getting API endpoints");
+			this.opts.logger("Getting API endpoints");
 			return this.api.get('/api').then(function (resp) {
 				_this2._devicesUrl = resp.data._links.devices.href;
 				_this2._profilesUrl = resp.data._links.profiles.href;
@@ -79,9 +82,9 @@ var Curb = exports.Curb = function () {
 		value: function _profiles() {
 			var _this3 = this;
 
-			console.log("Getting user information");
+			this.opts.logger("Getting user information");
 			return this.api.get(this._profilesUrl).then(function (resp) {
-				console.log("Processing user information");
+				_this3.opts.logger("Processing user information");
 				var profiles = resp.data._embedded.profiles;
 				profiles.forEach(function (val) {
 					_this3.profiles.push(new _.CurbProfile(val));
