@@ -1,6 +1,7 @@
 import axios from 'axios';
-import URLSearchParams from 'url-search-params';
-import { CurbProfile } from './curb-profile';
+import { CurbProfile } from './';
+
+global.URLSearchParams = require('url-search-params');
 
 export class Curb {
 	constructor(clientId, clientSecret) {

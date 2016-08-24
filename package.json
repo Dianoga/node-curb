@@ -2,9 +2,9 @@
   "name": "node-curb",
   "version": "1.0.0",
   "description": "Interact with the Curb API",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "babel src/ --out-dir dist --source-maps"
   },
   "author": "Brian Steere <dianoga7@3dgo.net>",
   "license": "MIT",
