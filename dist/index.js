@@ -16,14 +16,14 @@ Object.keys(_curb).forEach(function (key) {
   });
 });
 
-var _curbProfile = require('./curb-profile');
+var _curbLocation = require('./curb-location');
 
-Object.keys(_curbProfile).forEach(function (key) {
+Object.keys(_curbLocation).forEach(function (key) {
   if (key === "default" || key === "__esModule") return;
   Object.defineProperty(exports, key, {
     enumerable: true,
     get: function get() {
-      return _curbProfile[key];
+      return _curbLocation[key];
     }
   });
 });

@@ -1,2 +1,2 @@
 export * from './curb';
-export * from './curb-profile';
+export * from './curb-location';

@@ -11,13 +11,15 @@ var _axios = require('axios');
 
 var _axios2 = _interopRequireDefault(_axios);
 
+var _socket = require('socket.io-client');
+
+var _socket2 = _interopRequireDefault(_socket);
+
 var _ = require('./');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-global.URLSearchParams = require('url-search-params');
 
 var Curb = exports.Curb = function () {
 	function Curb(opts) {
@@ -26,71 +28,131 @@ var Curb = exports.Curb = function () {
 		this.opts = Object.assign({
 			clientId: null,
 			clientSecret: null,
-			logger: function logger(message) {}
+			logger: function logger() {}
 		}, opts);
 
-		this._curbApiUrl = 'https://app.energycurb.com';
-		this._tokenUrl = '/oauth2/token';
-		this._devicesUrl = null;
-		this._profilesUrl = null;
+		this._curbApiUrl = 'https://app.energycurb.com/api';
+		this._curbTokenUrl = 'https://energycurb.auth0.com/oauth/token';
 
-		this.profiles = [];
+		this.locations = {};
+
+		this.token = null;
 
 		this.api = _axios2.default.create({
 			baseURL: this._curbApiUrl
 		});
+
+		this._handleToken = this._handleToken.bind(this);
+		this._refreshToken = this._refreshToken.bind(this);
+		this.getLocations = this.getLocations.bind(this);
+		this.watch = this.watch.bind(this);
 	}
 
 	_createClass(Curb, [{
 		key: 'init',
 		value: function init(username, password) {
+			return this._getToken(username, password).then(this.getLocations);
+		}
+	}, {
+		key: '_getToken',
+		value: function _getToken(username, password) {
+			this.opts.logger('Getting access token');
+			return this.api.post(this._curbTokenUrl, {
+				client_id: this.opts.clientId,
+				client_secret: this.opts.clientSecret,
+				grant_type: 'password',
+				audience: 'app.energycurb.com/api',
+				scope: 'offline_access',
+				username: username,
+				password: password
+			}).then(this._handleToken);
+		}
+	}, {
+		key: '_refreshToken',
+		value: function _refreshToken() {
+			this.opts.logger('Refreshing access token');
+			return this.api.post(this._curbTokenUrl, {
+				grant_type: 'refresh_token',
+				client_id: this.opts.clientId,
+				client_secret: this.opts.clientSecret,
+				refresh_token: this.token.refresh_token
+			}).then(this._handleToken);
+		}
+	}, {
+		key: '_handleToken',
+		value: function _handleToken(resp) {
+			// Curb doesn't seem to give us a new refresh token
+			if (!resp.data.refresh_token && this.token.refresh_token) {
+				resp.data.refresh_token = this.token.refresh_token;
+			}
+
+			this.token = resp.data;
+			this.api.defaults.headers.common.Authorization = 'Bearer ' + this.token.access_token;
+
+			// Setup token refresh 1 minute before expiration
+			setTimeout(this._refreshToken, (this.token.expires_in - 60) * 1000);
+		}
+	}, {
+		key: 'getLocations',
+		value: function getLocations() {
 			var _this = this;
 
-			var data = new URLSearchParams();
-			data.append('grant_type', 'password');
-			data.append('username', username);
-			data.append('password', password);
+			if (!this.token) {
+				throw Error('No access token');
+			}
 
-			this.opts.logger("Getting access tokens");
-			return this.api.post(this._tokenUrl, data, {
-				auth: {
-					username: this.opts.clientId,
-					password: this.opts.clientSecret
-				}
-			}).then(function (resp) {
-				var token = new Buffer(resp.data.access_token).toString('base64');
-				_this.api.defaults.headers.common['Authorization'] = 'Bearer ' + token;
-
-				return _this._endpoints();
-			}).then(function () {
-				return _this._profiles();
-			});
-		}
-	}, {
-		key: '_endpoints',
-		value: function _endpoints() {
-			var _this2 = this;
-
-			this.opts.logger("Getting API endpoints");
-			return this.api.get('/api').then(function (resp) {
-				_this2._devicesUrl = resp.data._links.devices.href;
-				_this2._profilesUrl = resp.data._links.profiles.href;
-			});
-		}
-	}, {
-		key: '_profiles',
-		value: function _profiles() {
-			var _this3 = this;
-
-			this.opts.logger("Getting user information");
-			return this.api.get(this._profilesUrl).then(function (resp) {
-				_this3.opts.logger("Processing user information");
-				var profiles = resp.data._embedded.profiles;
-				profiles.forEach(function (val) {
-					_this3.profiles.push(new _.CurbProfile(val));
+			this.opts.logger('Getting locations');
+			return this.api.get(this._curbApiUrl + '/locations').then(function (resp) {
+				resp.data.forEach(function (location) {
+					_this.locations[location.id] = new _.CurbLocation(location);
 				});
 
-				return _this3.profiles;
+				return _this.locations;
+			}).catch(function (e) {
+				console.error(e);
+			});
+		}
+	}, {
+		key: 'watch',
+		value: function watch() {
+			var _this2 = this;
+
+			if (!this.token) {
+				throw Error('No access token');
+			}
+
+			this.opts.logger('Connecting to socket');
+
+			var socket = (0, _socket2.default)(this._curbApiUrl + '/circuit-data', { reconnect: true, transports: ['websocket'] });
+
+			socket.on('connect', function () {
+				_this2.opts.logger('Connected to socket: sending auth');
+				socket.emit('authenticate', { token: _this2.token.access_token });
+			});
+
+			socket.on('authorized', function () {
+				_this2.opts.logger('Socket authorized: subscribing to live data');
+
+				Object.keys(_this2.locations).forEach(function (key) {
+					socket.emit('subscribe', key);
+				});
+			});
+
+			socket.on('data', function (data) {
+				// Does the location exist?
+				if (!_this2.locations[data.locationId]) {
+					_this2.opts.logger('Unknown location: ' + data.locationId);
+					return;
+				}
+
+				_this2.locations[data.locationId].updateCircuits(data.circuits);
+			});
+
+			socket.on('connect_error', function (e) {
+				return console.error(e);
+			});
+			socket.on('error', function (e) {
+				return console.error(e);
 			});
 		}
 	}]);

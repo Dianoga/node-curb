@@ -1,70 +1,125 @@
 import axios from 'axios';
-import { CurbProfile } from './';
+import io from 'socket.io-client';
 
-global.URLSearchParams = require('url-search-params');
+import { CurbLocation } from './';
 
 export class Curb {
 	constructor(opts) {
 		this.opts = Object.assign({
 			clientId: null,
 			clientSecret: null,
-			logger: message => {}
+			logger: () => {}
 		}, opts);
 
-		this._curbApiUrl = 'https://app.energycurb.com';
-		this._tokenUrl = '/oauth2/token';
-		this._devicesUrl = null;
-		this._profilesUrl = null;
+		this._curbApiUrl = 'https://app.energycurb.com/api';
+		this._curbTokenUrl = 'https://energycurb.auth0.com/oauth/token';
 
-		this.profiles = [];
+		this.locations = {};
+
+		this.token = null;
 
 		this.api = axios.create({
 			baseURL: this._curbApiUrl
 		});
+
+		this._handleToken = this._handleToken.bind(this);
+		this._refreshToken = this._refreshToken.bind(this);
+		this.getLocations = this.getLocations.bind(this);
+		this.watch = this.watch.bind(this);
 	}
 
 	init(username, password) {
-		const data = new URLSearchParams();
-		data.append('grant_type', 'password');
-		data.append('username', username);
-		data.append('password', password);
-
-		this.opts.logger("Getting access tokens");
-		return this.api.post(this._tokenUrl, data, {
-			auth: {
-				username: this.opts.clientId,
-				password: this.opts.clientSecret
-			}
-		}).then(resp => {
-			const token = new Buffer(resp.data.access_token).toString('base64');
-			this.api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-			return this._endpoints();
-		}).then(() => {
-			return this._profiles();
-		});
+		return this._getToken(username, password)
+			.then(this.getLocations);
 	}
 
-	_endpoints() {
-		this.opts.logger("Getting API endpoints");
-		return this.api.get('/api')
-			.then((resp) => {
-				this._devicesUrl = resp.data._links.devices.href;
-				this._profilesUrl = resp.data._links.profiles.href;
-			});
+	_getToken(username, password) {
+		this.opts.logger('Getting access token');
+		return this.api.post(this._curbTokenUrl, {
+			client_id: this.opts.clientId,
+			client_secret: this.opts.clientSecret,
+			grant_type: 'password',
+			audience: 'app.energycurb.com/api',
+			scope: 'offline_access',
+			username: username,
+			password: password
+		}).then(this._handleToken);
 	}
 
-	_profiles() {
-		this.opts.logger("Getting user information");
-		return this.api.get(this._profilesUrl)
+	_refreshToken() {
+		this.opts.logger('Refreshing access token');
+		return this.api.post(this._curbTokenUrl, {
+			grant_type: 'refresh_token',
+			client_id: this.opts.clientId,
+			client_secret: this.opts.clientSecret,
+			refresh_token: this.token.refresh_token
+		}).then(this._handleToken);
+	}
+
+	_handleToken(resp) {
+		// Curb doesn't seem to give us a new refresh token
+		if (!resp.data.refresh_token && this.token.refresh_token) {
+			resp.data.refresh_token = this.token.refresh_token;
+		}
+
+		this.token = resp.data;
+		this.api.defaults.headers.common.Authorization = `Bearer ${this.token.access_token}`;
+
+		// Setup token refresh 1 minute before expiration
+		setTimeout(this._refreshToken, (this.token.expires_in - 60) * 1000);
+	}
+
+	getLocations() {
+		if (!this.token) {
+			throw Error('No access token');
+		}
+
+		this.opts.logger('Getting locations');
+		return this.api.get(`${this._curbApiUrl}/locations`)
 			.then(resp => {
-				this.opts.logger("Processing user information");
-				const profiles = resp.data._embedded.profiles;
-				profiles.forEach(val => {
-					this.profiles.push(new CurbProfile(val));
+				resp.data.forEach(location => {
+					this.locations[location.id] = new CurbLocation(location);
 				});
 
-				return this.profiles;
+				return this.locations;
+			}).catch(e => {
+				console.error(e);
 			});
+	}
+
+	watch() {
+		if (!this.token) {
+			throw Error('No access token');
+		}
+
+		this.opts.logger('Connecting to socket');
+
+		const socket = io(`${this._curbApiUrl}/circuit-data`, { reconnect: true, transports: ['websocket'] });
+
+		socket.on('connect', () => {
+			this.opts.logger('Connected to socket: sending auth');
+			socket.emit('authenticate', { token: this.token.access_token });
+		});
+
+		socket.on('authorized', () => {
+			this.opts.logger('Socket authorized: subscribing to live data');
+
+			Object.keys(this.locations).forEach(key => {
+				socket.emit('subscribe', key);
+			});
+		});
+
+		socket.on('data', data => {
+			// Does the location exist?
+			if (!this.locations[data.locationId]) {
+				this.opts.logger(`Unknown location: ${data.locationId}`);
+				return;
+			}
+
+			this.locations[data.locationId].updateCircuits(data.circuits);
+		});
+
+		socket.on('connect_error', e => console.error(e));
+		socket.on('error', e => console.error(e));
 	}
 }
