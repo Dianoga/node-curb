@@ -1,24 +1,30 @@
+import { Curb } from './curb';
+
+type LocationListener = (location: CurbLocation) => any;
+
 export class CurbLocation {
-	constructor(data) {
+	public id: string;
+	public label: string;
+	public circuits: { [id: string]: Curb.Circuit } = {};
+
+	private listeners: LocationListener[] = [];
+
+	constructor(data: Curb.Location) {
 		this.id = data.id;
-		this.name = data.name;
-
-		this._listeners = [];
-
-		this.circuits = {};
+		this.label = data.label;
 	}
 
-	addListener(func) {
-		this._listeners.push(func);
+	addListener(func: LocationListener) {
+		this.listeners.push(func);
 	}
 
 	notifyListeners() {
-		this._listeners.forEach((func) => {
+		this.listeners.forEach((func) => {
 			func(this);
 		});
 	}
 
-	updateCircuits(data) {
+	updateCircuits(data: Curb.Circuit[]) {
 		Object.values(data).forEach((circuit) => {
 			this.circuits[circuit.id] = circuit;
 		});

@@ -1,2 +1,2 @@
-export * from "./curb";
-export * from "./curb-location";
+export * from './curb';
+export * from './curb-location';
