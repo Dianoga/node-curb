@@ -1,5 +1,5 @@
 {
-	"name": "node-curb",
+	"name": "@steere/node-curb",
 	"version": "3.0.0-development",
 	"description": "Interact with the Curb API",
 	"main": "dist/index.js",
