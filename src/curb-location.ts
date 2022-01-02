@@ -13,13 +13,13 @@ export class CurbLocation {
 	}
 
 	notifyListeners() {
-		this._listeners.forEach(func => {
+		this._listeners.forEach((func) => {
 			func(this);
 		});
 	}
 
 	updateCircuits(data) {
-		Object.values(data).forEach(circuit => {
+		Object.values(data).forEach((circuit) => {
 			this.circuits[circuit.id] = circuit;
 		});
 
