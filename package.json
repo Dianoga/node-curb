@@ -11,6 +11,9 @@
 	},
 	"author": "Brian Steere <dianoga7@3dgo.net>",
 	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
 	"prettier": {
 		"useTabs": true,
 		"singleQuote": true
