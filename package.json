@@ -4,8 +4,8 @@
 	"description": "Interact with the Curb API",
 	"main": "dist/index.js",
 	"scripts": {
-		"build": "babel src/ --out-dir dist --source-maps",
-		"lint": "eslint -c .eslintrc ./src",
+		"build": "tsc",
+		"lint": "eslint ./src",
 		"prepare": "husky install"
 	},
 	"author": "Brian Steere <dianoga7@3dgo.net>",
@@ -17,7 +17,7 @@
 	"dependencies": {
 		"axios": "0.24.0",
 		"mqtt": "4.3.2",
-		"socket.io-client": "4.4.0",
+		"socket.io-client": "2.4.0",
 		"url-search-params": "0.9.0"
 	},
 	"devDependencies": {
