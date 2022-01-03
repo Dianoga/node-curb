@@ -139,10 +139,8 @@ export class Curb {
 			throw Error('No access token');
 		}
 
-		if (this.socket) {
-			this.opts.logger('Closing old socket');
-			this.socket.close();
-		}
+		// Stop any existing watch
+		this.stopWatch();
 
 		this.opts.logger('Connecting to socket');
 
@@ -178,5 +176,12 @@ export class Curb {
 
 		this.socket.on('connect_error', (e: Error) => console.error(e));
 		this.socket.on('error', (e: Error) => console.error(e));
+	}
+
+	stopWatch() {
+		if (this.socket) {
+			this.opts.logger('Closing old socket');
+			this.socket.close();
+		}
 	}
 }

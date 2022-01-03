@@ -9,9 +9,10 @@ if (!username || !password) {
 	throw new Error('Missing username or password');
 }
 
-const run = async () => {
-	const curb = new Curb({ username, password });
+let curb: Curb;
 
+const run = async () => {
+	curb = new Curb({ username, password });
 	const locations = await curb.init();
 	Object.values(locations).forEach((loc) => {
 		loc.addListener((loc) => {
@@ -30,3 +31,8 @@ const run = async () => {
 };
 
 run();
+
+process.on('SIGINT', () => {
+	console.log('Shutdown requested');
+	if (curb) curb.stopWatch();
+});
