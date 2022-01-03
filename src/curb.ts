@@ -3,52 +3,50 @@ import io from 'socket.io-client';
 
 import { CurbLocation } from './';
 
-export namespace Curb {
-	export type Options = {
-		clientId: string;
-		clientSecret: string;
-		username: string;
-		password: string;
-		logger: typeof console.log;
-	};
+export type Options = {
+	clientId: string;
+	clientSecret: string;
+	username: string;
+	password: string;
+	logger: typeof console.log;
+};
 
-	export type TokenResponse = {
-		access_token: string;
-		expires_in: number;
-		token_type: 'Bearer';
-	};
+export type TokenResponse = {
+	access_token: string;
+	expires_in: number;
+	token_type: 'Bearer';
+};
 
-	export type Location = {
-		address: string;
-		city: string;
-		country: string;
-		dt_created: string;
-		dt_modified: string;
-		geocode: string;
-		id: string;
-		label: string;
-		organization: string;
-		postcode: string;
-		state: string;
-		timezone: string;
-	};
+export type Location = {
+	address: string;
+	city: string;
+	country: string;
+	dt_created: string;
+	dt_modified: string;
+	geocode: string;
+	id: string;
+	label: string;
+	organization: string;
+	postcode: string;
+	state: string;
+	timezone: string;
+};
 
-	export type Circuit = {
-		id: string;
-		label: string;
-		grid: boolean;
-		main: boolean;
-		battery: boolean;
-		production: boolean;
-		circuit_type: 'consumption' | 'line_side_production' | 'main';
-		w: number;
-	};
+export type Circuit = {
+	id: string;
+	label: string;
+	grid: boolean;
+	main: boolean;
+	battery: boolean;
+	production: boolean;
+	circuit_type: 'consumption' | 'line_side_production' | 'main';
+	w: number;
+};
 
-	export type LocationsResponse = Location[];
-}
+export type LocationsResponse = Location[];
 
 export class Curb {
-	private opts: Curb.Options;
+	private opts: Options;
 	private curbApiUrl = 'https://app.energycurb.com/api/v3';
 	private curbSocketUrl = 'https://app.energycurb.com/api';
 	private curbTokenUrl = 'https://energycurb.auth0.com/oauth/token';
@@ -60,7 +58,7 @@ export class Curb {
 	private tokenExp?: number;
 	private locations: { [id: string]: CurbLocation } = {};
 
-	constructor(opts?: Partial<Curb.Options>) {
+	constructor(opts?: Partial<Options>) {
 		if (!opts?.username || !opts.password)
 			throw new Error('username and password are required');
 
@@ -98,7 +96,7 @@ export class Curb {
 			password: this.opts.password,
 		};
 
-		const resp = await this.api.post<Curb.TokenResponse>(
+		const resp = await this.api.post<TokenResponse>(
 			this.curbTokenUrl,
 			requestData
 		);
@@ -124,7 +122,7 @@ export class Curb {
 
 		this.opts.logger('Getting locations');
 
-		const resp = await this.api.get<Curb.LocationsResponse>(
+		const resp = await this.api.get<LocationsResponse>(
 			`${this.curbApiUrl}/locations`
 		);
 
@@ -167,7 +165,7 @@ export class Curb {
 
 		this.socket.on(
 			'data',
-			(data: { locationId: string; circuits: Curb.Circuit[] }) => {
+			(data: { locationId: string; circuits: Circuit[] }) => {
 				// Does the location exist?
 				if (!this.locations[data.locationId]) {
 					this.opts.logger(`Unknown location: ${data.locationId}`);

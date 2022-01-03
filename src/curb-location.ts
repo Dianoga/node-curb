@@ -1,15 +1,15 @@
-import { Curb } from './curb';
+import { Circuit, Location } from './curb';
 
 type LocationListener = (location: CurbLocation) => any;
 
 export class CurbLocation {
 	public id: string;
 	public label: string;
-	public circuits: { [id: string]: Curb.Circuit } = {};
+	public circuits: { [id: string]: Circuit } = {};
 
 	private listeners: LocationListener[] = [];
 
-	constructor(data: Curb.Location) {
+	constructor(data: Location) {
 		this.id = data.id;
 		this.label = data.label;
 	}
@@ -24,7 +24,7 @@ export class CurbLocation {
 		});
 	}
 
-	updateCircuits(data: Curb.Circuit[]) {
+	updateCircuits(data: Circuit[]) {
 		Object.values(data).forEach((circuit) => {
 			this.circuits[circuit.id] = circuit;
 		});

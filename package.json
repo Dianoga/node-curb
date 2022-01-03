@@ -41,8 +41,7 @@
 		"semantic-release": "18.0.1"
 	},
 	"lint-staged": {
-		"src/**/*": "eslint --cache --fix",
-		"src/**/*.ts?(x)": "tsc"
+		"src/**/*": "eslint --cache --fix"
 	},
 	"repository": {
 		"type": "git",
